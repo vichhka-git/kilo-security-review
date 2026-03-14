@@ -1,7 +1,7 @@
 ---
 name: security-review
 description: Comprehensive security vulnerability analysis - matches Claude Code /security-review methodology with parallel agent execution, false positive filtering, and HackerOne cross-reference
-version: 3.5.0
+version: 3.6.0
 author: security-review
 tags: [security, vulnerability, SAST, bug-bounty, AI]
 tools: [Bash, Read, Glob, Grep, call_omo_agent]
@@ -88,11 +88,28 @@ grep -rn "open\(|read\(|file" --include="*.py" --include="*.js" | grep -v "test"
 - Session management flaws
 - JWT vulnerabilities (no expiry, weak secret, algorithm confusion)
 - Authorization bypasses (IDOR, BOLA)
+- Mass Assignment (arbitrary field injection)
+- Weak PIN/password reset mechanisms
+- File upload validation bypasses
 
 **Search patterns:**
 ```
+# Mass Assignment
+grep -rn "for.*key.*in.*data|for.*k.*v.*items|\.update\(" --include="*.py" --include="*.js"
+grep -rn "is_admin|role|permission" --include="*.py" | grep -v "check\|verify"
+
+# Weak PIN/password reset
+grep -rn "randint.*999|random.*pin|pin.*=" --include="*.py"
+grep -rn "forgot.*password|reset.*pin" --include="*.py"
+
+# File upload
+grep -rn "file\.save|upload|filename" --include="*.py" | grep -v "secure_filename\|validate"
+
+# JWT issues
 grep -rn "jwt\.|JWT" --include="*.py" --include="*.js"
 grep -rn "session|cookie|token" --include="*.py" --include="*.js" | grep -v "test"
+
+# Routes without auth
 grep -rn "@app.route|def " --include="*.py" | grep -v "auth\|verify\|token"
 ```
 
@@ -139,9 +156,21 @@ grep -rn "return.*error|jsonify.*error" --include="*.py"
 
 **Android patterns:**
 ```
+# Insecure data storage
 grep -rn "SharedPreferences|MODE_PRIVATE" --include="*.java" --include="*.kt"
+grep -rn "putString.*password|putString.*token|putString.*secret" --include="*.java" --include="*.kt"
+
+# Manifest security settings
 grep -rn "allowBackup|debuggable|usesCleartextTraffic|exported" --include="AndroidManifest.xml"
-grep -rn "password=|secret=|key=" --include="*.java" --include="*.kt"
+
+# Hardcoded secrets in code
+grep -rn "password=|secret=|key=|JWT|api[_-]?key" --include="*.java" --include="*.kt"
+
+# Certificate pinning
+grep -rn "pinning|TrustManager|HostnameVerifier" --include="*.java" --include="*.kt" | grep -v "true"
+
+# ProGuard/R8 disabled
+grep -rn "minifyEnabled|proguard" --include="build.gradle" | grep -v "true"
 ```
 
 **iOS patterns:**
