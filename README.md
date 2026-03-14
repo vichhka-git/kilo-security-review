@@ -40,7 +40,7 @@ source ~/.bashrc
 ### Step 2: Clone & Install
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/kilo-security-review.git ~/kilo-security-review
+git clone https://github.com/vichhka-git/kilo-security-review.git ~/kilo-security-review
 
 # Run installer - it will auto-discover AI models and ask you to select one
 cd ~/kilo-security-review
