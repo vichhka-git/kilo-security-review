@@ -1,47 +1,22 @@
 ---
 name: security-review
 description: Comprehensive security vulnerability analysis with AI reasoning - combines Semgrep, CodeQL, and free LLM for bug bounty hunting
-version: 2.2.0
+version: 2.3.0
 author: security-review
 tags: [security, vulnerability, SAST, bug-bounty, AI]
 tools: [Bash, Read, Glob, Grep]
 ---
 
-# Security Review Skill - Enhanced for Bug Bounty
+# Security Review Skill - v2.3.0
 
 You are a senior security engineer and bug bounty hunter. Your goal is to find exploitable vulnerabilities that others miss.
 
 ## Objective
 
 Find HIGH-IMPACT security vulnerabilities using a three-layer approach:
-1. **Layer 1**: Semgrep (fast pattern matching)
-2. **Layer 2**: CodeQL (deep semantic analysis)
-3. **Layer 3**: AI Reasoning (logic flaw detection with LLM)
-
-## NEW USER FLOW - Model Selection
-
-When user activates this skill for the FIRST TIME or requests model selection:
-
-### Step 0: Auto-Discover & Select AI Model
-
-Run this command to discover available models:
-```bash
-kilo models 2>/dev/null
-```
-
-Present the user with model options from the output. PRIORITIZE these free models:
-- kilo/kilo-auto/free
-- kilo/minimax/minimax-m2.5:free  
-- kilo/x-ai/grok-code-fast-1:optimized:free
-- kilo/nvidia/nemotron-3-super-120b-a12b:free
-- kilo/openrouter/free
-- kilo/stepfun/step-3.5-flash:free
-
-ASK the user to select their preferred model by number or name.
-
-Once selected, remember the model for this session and use it for all AI analysis in Layer 3.
-
-If user doesn't specify a model, default to: `kilo/kilo-auto/free`
+1. **Layer 1**: Semgrep (fast pattern matching) - RUN IT
+2. **Layer 2**: CodeQL (deep semantic analysis) - RUN IT  
+3. **Layer 3**: YOU analyze the results - DO IT YOURSELF
 
 ## Workflow
 
@@ -89,53 +64,52 @@ unzip codeql.zip
 export PATH=$PATH:$(pwd)/codeql
 ```
 
-### Step 4: Layer 3 - AI Reasoning (AUTOMATIC - DO NOT ASK USER TO RE-RUN)
+### Step 4: Layer 3 - AI Reasoning (THIS IS YOUR JOB - DO IT YOURSELF)
 
-**CRITICAL**: After Layer 1 (Semgrep) and Layer 2 (CodeQL) complete, you MUST immediately continue to Layer 3 analysis. DO NOT ask the user to re-run the skill or start a new session. Use the current session context.
+**CRITICAL**: After Layer 1 (Semgrep) and Layer 2 (CodeQL) complete, YOU analyze the results. DO NOT call another AI model or ask the user to re-run. You have all the context - use it.
 
-**IMPORTANT**: Use the model the user selected in Step 0. If no model was selected, default to `kilo/kilo-auto/free`.
-
-After scanning tools complete, IMMEDIATELY invoke the selected model to analyze findings using call_omo_agent or kilo run. Pass the findings as context:
-
-```
-You are a bug bounty hunter analyzing security scan results for this project.
-
-EXISTING FINDINGS FROM AUTOMATED TOOLS:
-[Semgrep findings from semgrep-results.json]
-[CodeQL findings if available]
-
-YOUR TASK:
-1. Analyze these findings for EXPLOITABILITY
-2. Look for LOGIC FLAWS that pattern-matching tools miss:
-   - Authorization bypasses
+Your responsibilities in Layer 3:
+1. Parse semgrep-results.json and codeql-results.sarif
+2. Analyze each finding for EXPLOITABILITY
+3. Look for LOGIC FLAWS that pattern-matching tools miss:
+   - Authorization bypasses (IDOR)
    - Race conditions
    - Business logic vulnerabilities
-   - IDOR (Insecure Direct Object References)
    - Authentication flaws
    - SSRF via user-controlled URLs
-3. Identify the ATTACK CHAIN - how can these be chained together?
-4. For each finding, provide:
-   - Exploitability: How would an attacker actually exploit this?
+4. Identify ATTACK CHAINS - how vulnerabilities can be chained
+5. For each finding, determine:
+   - Exploitability: How would an attacker actually exploit?
    - Severity: What's the real-world impact?
-   - PoC: Brief description of proof-of-concept
+   - PoC: Brief proof-of-concept
 
-Focus on FINDING WHAT OTHER TOOLS MISS - subtle authorization issues, logic bugs, edge cases.
-```
+**DO NOT**: Call kilo run, call_omo_agent, or any other AI. YOU are the AI. Analyze it yourself.
 
-**IMPORTANT**: Parse semgrep-results.json and pass the actual findings to the AI model. Do not ask the user to re-run anything.
+### Step 5: Deep Manual Analysis (DO IT YOURSELF - Use grep/ast_grep/LSP)
 
-### Step 5: Manual Security Checks (AUTOMATIC - Continue in Same Session)
+Run targeted searches YOURSELF using grep, ast_grep, and lsp tools. Find what automated tools miss:
 
-Run targeted searches for common bug bounty targets using grep/ast_grep tools. DO NOT ask user to re-run:
-
-**IDOR vulnerabilities:**
+**IDOR - Use grep to find missing auth:**
 ```bash
-# Look for object references in URLs/params
-grep -rn "req.params\|req.query\|request.params\|request.query\|$\|_\|id\|userId\|postId" --include="*.js" --include="*.ts" --include="*.py" . 2>/dev/null | head -30
-
-# Look for missing authorization checks
-grep -rn "verifyToken\|authenticate\|checkPermission" --include="*.js" --include="*.ts" . 2>/dev/null | head -20
+# Search for routes without @token_required or similar decorators
+grep -rn "@app.route\|@router\|def " --include="*.py" . | grep -v "verify\|auth\|token\|permission"
 ```
+
+**Hardcoded Secrets - Use grep:**
+```bash
+grep -rnE "(password|secret|key|token)\s*=\s*['\"]" --include="*.py" --include="*.js" --include="*.java" .
+```
+
+**SQL Injection - Use ast_grep:**
+```bash
+# Find f-strings or string concatenation in SQL contexts
+ast_grep --lang python -p 'f"SELECT $_" | f"INSERT $_" | f"UPDATE $_"'
+```
+
+**Missing Authentication - Use grep to find routes:**
+```bash
+grep -rn "def \|@app.route" --include="*.py" . | head -50
+# Then check each route for @token_required decorator
 
 **SSRF (Server-Side Request Forgery):**
 ```bash
