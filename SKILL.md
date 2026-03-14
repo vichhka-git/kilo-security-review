@@ -1,11 +1,10 @@
 ---
 name: security-review
 description: Comprehensive security vulnerability analysis with AI reasoning - combines Semgrep, CodeQL, and free LLM for bug bounty hunting
-version: 2.1.0
+version: 2.2.0
 author: security-review
 tags: [security, vulnerability, SAST, bug-bounty, AI]
 tools: [Bash, Read, Glob, Grep]
-# Model will be set by config file during installation
 ---
 
 # Security Review Skill - Enhanced for Bug Bounty
@@ -90,20 +89,20 @@ unzip codeql.zip
 export PATH=$PATH:$(pwd)/codeql
 ```
 
-### Step 4: Layer 3 - AI Reasoning with User-Selected LLM
+### Step 4: Layer 3 - AI Reasoning (AUTOMATIC - DO NOT ASK USER TO RE-RUN)
+
+**CRITICAL**: After Layer 1 (Semgrep) and Layer 2 (CodeQL) complete, you MUST immediately continue to Layer 3 analysis. DO NOT ask the user to re-run the skill or start a new session. Use the current session context.
 
 **IMPORTANT**: Use the model the user selected in Step 0. If no model was selected, default to `kilo/kilo-auto/free`.
 
-After scanning tools complete, invoke the selected model to analyze findings and find logic flaws:
-
-For example, if user selected `kilo/kilo-auto/free`, call it with:
+After scanning tools complete, IMMEDIATELY invoke the selected model to analyze findings using call_omo_agent or kilo run. Pass the findings as context:
 
 ```
-You are a bug bounty hunter analyzing security scan results. 
+You are a bug bounty hunter analyzing security scan results for this project.
 
-EXISTING FINDINGS FROM TOOLS:
-[Insert Semgrep findings]
-[Insert CodeQL findings if available]
+EXISTING FINDINGS FROM AUTOMATED TOOLS:
+[Semgrep findings from semgrep-results.json]
+[CodeQL findings if available]
 
 YOUR TASK:
 1. Analyze these findings for EXPLOITABILITY
@@ -123,9 +122,11 @@ YOUR TASK:
 Focus on FINDING WHAT OTHER TOOLS MISS - subtle authorization issues, logic bugs, edge cases.
 ```
 
-### Step 5: Manual Security Checks (Bug Bounty Focus)
+**IMPORTANT**: Parse semgrep-results.json and pass the actual findings to the AI model. Do not ask the user to re-run anything.
 
-Run targeted searches for common bug bounty targets:
+### Step 5: Manual Security Checks (AUTOMATIC - Continue in Same Session)
+
+Run targeted searches for common bug bounty targets using grep/ast_grep tools. DO NOT ask user to re-run:
 
 **IDOR vulnerabilities:**
 ```bash
@@ -161,13 +162,15 @@ grep -rn "exec\|spawn\|execSync\|system\|popen\|os\.system" --include="*.js" --i
 grep -rnE "(api[_-]?key|password|secret|token|private[_-]?key|aws[_-]?access)" --include="*.js" --include="*.ts" --include="*.py" --include="*.go" --include="*.env" . 2>/dev/null | grep -v node_modules | head -30
 ```
 
-### Step 6: Analyze & Prioritize
+### Step 6: Synthesize & Report
 
-For each vulnerability, assess:
+For each vulnerability found from Layers 1-5, assess:
 - **CVSS Score** (if applicable)
 - **Exploitability**: How easy to exploit?
 - **Impact**: What's the worst case?
 - **Bug Bounty Value**: Is this a valid target for bug bounty programs?
+
+Then provide the complete Bug Bounty Report to the user.
 
 ## Output Format
 
