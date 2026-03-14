@@ -1,7 +1,7 @@
 ---
 name: security-review
 description: Comprehensive security vulnerability analysis - matches Claude Code /security-review methodology with parallel agent execution, false positive filtering, and HackerOne cross-reference
-version: 3.2.0
+version: 3.3.0
 author: security-review
 tags: [security, vulnerability, SAST, bug-bounty, AI]
 tools: [Bash, Read, Glob, Grep, call_omo_agent]
@@ -183,20 +183,69 @@ For each finding, assess:
 
 ## Phase 5: Comprehensive Output
 
-For each CONFIRMED vulnerability, provide:
+For each CONFIRMED vulnerability, provide a detailed report matching professional security review standards:
 
 ```
-# Vuln: [Type] - `file:line`
+# [VULN #X] [Type] - `file:line`
 
-* Severity: [CRITICAL/HIGH/MEDIUM]
-* Category: [e.g., sql_injection, xss, auth_bypass]
-* Confidence: [7-10]
-* Description: [What the vulnerability is]
-* Exploit Scenario: [How to exploit]
-* Recommendation: [How to fix]
+| Field | Detail |
+|---|---|
+| **Severity** | 🔴 CRITICAL / 🟠 HIGH / 🟡 MEDIUM / 🔵 INFO |
+| **OWASP Category** | [e.g., A03:2021 - Injection] |
+| **CVSS Score** | [0.0 - 10.0] |
+| **Location** | `file:line` |
+| **Confidence** | [7-10]/10 |
+
+**Description**
+[Brief description of the vulnerability]
+
+**Vulnerable Pattern**
+```[language]
+// Show the actual vulnerable code
 ```
+
+**Impact**
+[Real-world impact - what can an attacker achieve?]
+
+**Exploitation**
+```bash
+# Show how to exploit this vulnerability
+```
+
+**Remediation**
+- Step 1 to fix
+- Step 2 to fix
+- Step 3 to fix
+
+**HackerOne Cross-Reference**
+- [Similar report on H1] - [bounty amount]
+- [Another similar report] - [bounty amount]
 
 ---
+
+## CVSS Scoring Reference
+
+Assign CVSS scores based on impact:
+
+| Vulnerability Type | Typical Score | Rationale |
+|-------------------|---------------|-----------|
+| SQL Injection (auth bypass) | 9.8 | Network exploit, no auth, full compromise |
+| Hardcoded JWT/secret | 9.1 | Extract from APK, forge tokens |
+| IDOR (financial) | 8.5 | Access any user's financial data |
+| Auth bypass (unauthenticated) | 8.6 | No login required |
+| Hardcoded password in code | 7.5 | Easy to find, no exploit needed |
+| Insecure storage (SharedPrefs) | 7.1 | Requires physical/ADB access |
+| Cleartext HTTP | 7.5 | Network interception possible |
+| Debug mode enabled | 6.5 | Information disclosure |
+| Missing rate limiting | 5.3 | DoS possible |
+
+**Severity Thresholds:**
+- CRITICAL: 9.0 - 10.0
+- HIGH: 7.0 - 8.9
+- MEDIUM: 4.0 - 6.9
+- LOW: 0.1 - 3.9
+- INFO: 0.0
+```
 
 ## Summary Output Format
 
