@@ -1,196 +1,230 @@
 ---
 name: security-review
-description: Comprehensive security vulnerability analysis with AI reasoning - combines Semgrep, CodeQL, and free LLM for bug bounty hunting
-version: 2.3.0
+description: Comprehensive security vulnerability analysis - matches Claude Code /security-review methodology with parallel agent execution and false positive filtering
+version: 3.0.0
 author: security-review
 tags: [security, vulnerability, SAST, bug-bounty, AI]
-tools: [Bash, Read, Glob, Grep]
+tools: [Bash, Read, Glob, Grep, call_omo_agent]
 ---
 
-# Security Review Skill - v2.3.0
+# Security Review Skill - v3.0.0
 
-You are a senior security engineer and bug bounty hunter. Your goal is to find exploitable vulnerabilities that others miss.
+You are a senior security engineer. Your goal is comprehensive security vulnerability analysis.
+
+## Key Difference from v2.x
+
+v3.0 uses **parallel agent execution** and **false positive filtering** - matching Claude Code's methodology.
 
 ## Objective
 
-Find HIGH-IMPACT security vulnerabilities using a three-layer approach:
-1. **Layer 1**: Semgrep (fast pattern matching) - RUN IT
-2. **Layer 2**: CodeQL (deep semantic analysis) - RUN IT  
-3. **Layer 3**: YOU analyze the results - DO IT YOURSELF
+Perform comprehensive security review to identify HIGH-CONFIDENCE vulnerabilities with real exploitation potential.
 
-## Workflow
+---
 
-### Step 1: Detect Project Type
+## Phase 1: Repository Context Research
 
-Identify language and framework:
+Before analyzing, understand the codebase:
+
+1. **Map directory structure:**
 ```bash
-# Quick detection
+ls -la
+Glob "**/*"
+```
+
+2. **Identify technologies:**
+```bash
 ls -la | grep -E "package.json|requirements.txt|go.mod|Cargo.toml|pom.xml|*.csproj|composer.json"
 ```
 
-### Step 2: Layer 1 - Semgrep Scan (Fast)
+3. **Identify frameworks & security libraries:**
+- What web frameworks? (Express, Flask, Django, Gin, Spring)
+- What auth is used? (JWT, Session, OAuth)
+- What databases? (SQL, NoSQL)
 
-Run Semgrep with auto config:
-```bash
-semgrep --config=auto --json --output=semgrep-results.json . 2>/dev/null || semgrep --config=auto .
+4. **Map trust boundaries:**
+- Where does client trust server?
+- Where does server trust client?
+- What crosses network unencrypted?
+
+---
+
+## Phase 2: Parallel Vulnerability Scanning
+
+Launch MULTIPLE parallel searches for different vulnerability categories:
+
+### Agent 1: Input Validation Vulnerabilities
+- SQL injection (string concatenation in queries)
+- Command injection (exec, spawn, system calls)
+- XXE injection (XML parsing)
+- Template injection (Jinja2, Handlebars)
+- NoSQL injection
+- Path traversal (file operations with user input)
+
+**Search patterns:**
+```
+grep -rn "SELECT.*+|INSERT.*+|UPDATE.*+|DELETE.*+" --include="*.py" --include="*.js" --include="*.ts"
+grep -rn "exec\(|spawn\(|system\(|os\.system" --include="*.py" --include="*.js" --include="*.go"
+grep -rn "open\(|read\(|file" --include="*.py" --include="*.js" | grep -v "test"
 ```
 
-**If Semgrep not installed:**
-```bash
-pip install semgrep
+### Agent 2: Authentication & Authorization
+- Authentication bypass logic
+- Privilege escalation paths
+- Session management flaws
+- JWT vulnerabilities (no expiry, weak secret, algorithm confusion)
+- Authorization bypasses (IDOR, BOLA)
+
+**Search patterns:**
+```
+grep -rn "jwt\.|JWT" --include="*.py" --include="*.js"
+grep -rn "session|cookie|token" --include="*.py" --include="*.js" | grep -v "test"
+grep -rn "@app.route|def " --include="*.py" | grep -v "auth\|verify\|token"
 ```
 
-### Step 3: Layer 2 - CodeQL Scan (Deep)
+### Agent 3: Secrets & Cryptography
+- Hardcoded API keys, passwords, tokens
+- Weak crypto (MD5, SHA-1, DES)
+- Improper key storage
+- Certificate validation bypasses
 
-**For supported languages (JavaScript, TypeScript, Python, Go, Java, C#):**
-
-```bash
-# Check if CodeQL is available
-which codeql || echo "CodeQL not installed"
-
-# Try to run CodeQL if available
-# Create database
-codeql database create codeql-db --language=javascript --source-root=. 2>/dev/null || true
-
-# Run security queries
-codeql database analyze codeql-db --format=sarif-latest --output=codeql-results.sarif codeql/java-security-and-quality 2>/dev/null || true
+**Search patterns:**
+```
+grep -rnE "(api[_-]?key|password|secret|token)\s*=\s*['\"]" --include="*.py" --include="*.js" --include="*.java"
+grep -rnE "hashlib\.(md5|sha1)|Crypto\.Cipher" --include="*.py"
+grep -rn ".env|DATABASE_URL|JWT_SECRET|SECRET_KEY" --include="*.py" --include="*.js"
 ```
 
-**If CodeQL not installed, install:**
-```bash
-# Download CodeQL CLI
-curl -L -o codeql.zip https://github.com/github/codeql-cli-binaries/releases/latest/download/codeql-linux64.zip
-unzip codeql.zip
-export PATH=$PATH:$(pwd)/codeql
+### Agent 4: Injection & Code Execution
+- Remote code execution (deserialization)
+- Pickle/YAML deserialization vulnerabilities
+- Eval injection
+- XSS (reflected, stored, DOM)
+
+**Search patterns:**
+```
+grep -rn "pickle\.|yaml\.load|eval\(|exec\(" --include="*.py"
+grep -rn "dangerouslySetInnerHTML|bypassSecurityTrust" --include="*.ts" --include="*.tsx"
+grep -rn "innerHTML|\.html\(" --include="*.js" --include="*.ts"
 ```
 
-### Step 4: Layer 3 - AI Reasoning (THIS IS YOUR JOB - DO IT YOURSELF)
+### Agent 5: Data Exposure
+- Sensitive data logging
+- PII handling violations
+- API data leakage
+- Debug information exposure
 
-**CRITICAL**: After Layer 1 (Semgrep) and Layer 2 (CodeQL) complete, YOU analyze the results. DO NOT call another AI model or ask the user to re-run. You have all the context - use it.
-
-Your responsibilities in Layer 3:
-1. Parse semgrep-results.json and codeql-results.sarif
-2. Analyze each finding for EXPLOITABILITY
-3. Look for LOGIC FLAWS that pattern-matching tools miss:
-   - Authorization bypasses (IDOR)
-   - Race conditions
-   - Business logic vulnerabilities
-   - Authentication flaws
-   - SSRF via user-controlled URLs
-4. Identify ATTACK CHAINS - how vulnerabilities can be chained
-5. For each finding, determine:
-   - Exploitability: How would an attacker actually exploit?
-   - Severity: What's the real-world impact?
-   - PoC: Brief proof-of-concept
-
-**DO NOT**: Call kilo run, call_omo_agent, or any other AI. YOU are the AI. Analyze it yourself.
-
-### Step 5: Deep Manual Analysis (DO IT YOURSELF - Use grep/ast_grep/LSP)
-
-Run targeted searches YOURSELF using grep, ast_grep, and lsp tools. Find what automated tools miss:
-
-**IDOR - Use grep to find missing auth:**
-```bash
-# Search for routes without @token_required or similar decorators
-grep -rn "@app.route\|@router\|def " --include="*.py" . | grep -v "verify\|auth\|token\|permission"
+**Search patterns:**
+```
+grep -rn "console\.log\|print\(|logger" --include="*.py" --include="*.js" --include="*.ts"
+grep -rn "debug\|trace\|error" --include="*.py" | grep -E "password|token|secret"
+grep -rn "return.*error|jsonify.*error" --include="*.py"
 ```
 
-**Hardcoded Secrets - Use grep:**
-```bash
-grep -rnE "(password|secret|key|token)\s*=\s*['\"]" --include="*.py" --include="*.js" --include="*.java" .
+### Agent 6: Mobile-Specific (Android/iOS)
+
+**Android patterns:**
+```
+grep -rn "SharedPreferences|MODE_PRIVATE" --include="*.java" --include="*.kt"
+grep -rn "allowBackup|debuggable|usesCleartextTraffic|exported" --include="AndroidManifest.xml"
+grep -rn "password=|secret=|key=" --include="*.java" --include="*.kt"
 ```
 
-**SQL Injection - Use ast_grep:**
-```bash
-# Find f-strings or string concatenation in SQL contexts
-ast_grep --lang python -p 'f"SELECT $_" | f"INSERT $_" | f"UPDATE $_"'
+**iOS patterns:**
+```
+grep -rn "UserDefaults" --include="*.swift"
+grep -rn "NSAppTransportSecurity|ATS" --include="*.plist"
+grep -rn "Keychain" --include="*.swift"
 ```
 
-**Missing Authentication - Use grep to find routes:**
-```bash
-grep -rn "def \|@app.route" --include="*.py" . | head -50
-# Then check each route for @token_required decorator
+---
 
-**SSRF (Server-Side Request Forgery):**
-```bash
-# Look for URL fetching with user input
-grep -rn "fetch\|axios\|requests\|urllib\|http\.get\|http\.post\|urlopen" --include="*.js" --include="*.ts" --include="*.py" --include="*.go" . 2>/dev/null | head -30
-```
+## Phase 3: Vulnerability Assessment
 
-**SQL Injection patterns:**
-```bash
-# String concatenation in queries
-grep -rn "SELECT.*+\|INSERT.*+\|UPDATE.*+\|DELETE.*+\|WHERE.*+" --include="*.js" --include="*.ts" --include="*.py" . 2>/dev/null | head -20
+For each finding, assess:
 
-# Template literals in SQL
-grep -rn "`.*SELECT\|`.*INSERT\|`.*UPDATE" --include="*.js" --include="*.ts" . 2>/dev/null | head -20
-```
+1. **Exploitability**: Can this be exploited? What's the attack path?
+2. **Impact**: What's the worst case? Data breach? RCE? Account takeover?
+3. **Confidence**: Rate 1-10
+   - 7-10: Report it (clear vulnerability pattern)
+   - 4-6: Flag for manual review
+   - 1-3: Skip (too speculative)
 
-**Command Injection:**
-```bash
-grep -rn "exec\|spawn\|execSync\|system\|popen\|os\.system" --include="*.js" --include="*.ts" --include="*.py" --include="*.go" . 2>/dev/null | head -20
-```
+---
 
-**Hardcoded Secrets:**
-```bash
-grep -rnE "(api[_-]?key|password|secret|token|private[_-]?key|aws[_-]?access)" --include="*.js" --include="*.ts" --include="*.py" --include="*.go" --include="*.env" . 2>/dev/null | grep -v node_modules | head -30
-```
+## Phase 4: False Positive Filtering
 
-### Step 6: Synthesize & Report
+**EXCLUDE these findings:**
+- Denial of Service (DOS) vulnerabilities
+- Rate limiting concerns
+- Theoretical issues without clear attack path
+- Memory safety issues in memory-safe languages (Rust, Go)
+- Unit test files
+- Log spoofing concerns
+- Lack of audit logs
+- Lack of hardening measures (not a vulnerability)
 
-For each vulnerability found from Layers 1-5, assess:
-- **CVSS Score** (if applicable)
-- **Exploitability**: How easy to exploit?
-- **Impact**: What's the worst case?
-- **Bug Bounty Value**: Is this a valid target for bug bounty programs?
+**ASSUME SAFE:**
+- Environment variables (trusted)
+- UUIDs (unguessable)
+- Client-side validation (server handles it)
+- React/Angular XSS (unless dangerouslySetInnerHTML)
+- Path-only SSRF (must control host/protocol)
 
-Then provide the complete Bug Bounty Report to the user.
+---
 
-## Output Format
+## Phase 5: Comprehensive Output
 
-### Bug Bounty Report
+For each CONFIRMED vulnerability, provide:
 
 ```
-## Executive Summary
-- Total Issues Found: X
-- Critical: X | High: X | Medium: X | Low: X
-- Most Exploitable: [Top 3 findings]
+# Vuln: [Type] - `file:line`
 
-## Critical Findings
-
-### [CRITICAL] Vulnerability Name
-- **File**: `path/to/file:line`
-- **Type**: [Injection/IDOR/Auth Bypass/etc]
-- **CVSS**: [Score if calculated]
-- **Description**: 
-- **Exploit Scenario**: How would you exploit this?
-- **PoC**:
+* Severity: [CRITICAL/HIGH/MEDIUM]
+* Category: [e.g., sql_injection, xss, auth_bypass]
+* Confidence: [7-10]
+* Description: [What the vulnerability is]
+* Exploit Scenario: [How to exploit]
+* Recommendation: [How to fix]
 ```
-[Code or steps to reproduce]
+
+---
+
+## Summary Output Format
+
 ```
-- **Remediation**: 
+## Security Review Summary
 
-## AI Analysis (Layer 3)
+### Findings
+| Severity | Count |
+|----------|-------|
+| CRITICAL | X    |
+| HIGH     | X    |
+| MEDIUM   | X    |
+| LOW      | X    |
 
-[Insert AI reasoning about logic flaws, attack chains, and findings that tools missed]
+### By Category
+| Category | Count |
+|----------|-------|
+| SQL Injection | X |
+| Auth Bypass   | X |
+| ...           | X |
 
-## Recommendations
+### Top Exploitable
+1. [Finding 1]
+2. [Finding 2]
+3. [Finding 3]
 
-Priority order for fixing:
-1. 
-2. 
-3. 
+### Recommendations
+1. Fix [Critical]
+2. Fix [High]
+3. Fix [Medium]
 ```
+
+---
 
 ## Notes
 
-- **Bug bounty focus**: Look for exploitable issues, not just theoretical vulnerabilities
-- **Chain findings**: Often单个 vulnerability isn't critical, but chained together becomes severe
-- **False positives**: Verify each finding manually before reporting
-- **Focus areas for bug bounty**:
-  - IDOR (horizontal/vertical privilege escalation)
-  - Authentication bypasses
-  - SSRF
-  - Race conditions
-  - Business logic flaws
-  - API security issues
+- **MINIMIZE NOISE**: Better to miss theoretical issues than flood with false positives
+- **FOCUS ON IMPACT**: Prioritize vulnerabilities leading to data breach, RCE, or auth bypass
+- **PARALLEL IS FASTER**: Launch multiple grep searches simultaneously
+- **MANUAL VERIFY**: Read the actual code to confirm vulnerability before reporting
