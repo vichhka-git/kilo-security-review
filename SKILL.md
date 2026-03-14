@@ -1,7 +1,7 @@
 ---
 name: security-review
 description: Comprehensive security vulnerability analysis - matches Claude Code /security-review methodology with parallel agent execution, false positive filtering, and HackerOne cross-reference
-version: 3.6.0
+version: 3.7.0
 author: security-review
 tags: [security, vulnerability, SAST, bug-bounty, AI]
 tools: [Bash, Read, Glob, Grep, call_omo_agent]
@@ -37,6 +37,17 @@ else
     git clone --depth 1 https://github.com/reddelexc/hackerone-reports.git .
 fi
 ```
+
+**CRITICAL - YOU MUST USE H1 DATA:**
+For each vulnerability type found, IMMEDIATELY read the relevant H1 report file:
+- SQLi → Read TOPSQLI.md
+- XSS → Read TOPXSS.md  
+- IDOR → Read TOPIDOR.md
+- SSRF → Read TOPSSRF.md
+- RCE → Read TOPRCE.md
+- etc.
+
+Then include specific H1 report examples in your findings with bounty amounts.
 
 Before analyzing, understand the codebase:
 
@@ -252,9 +263,10 @@ For each CONFIRMED vulnerability, provide a detailed report matching professiona
 - Step 2 to fix
 - Step 3 to fix
 
-**HackerOne Cross-Reference**
-- [Similar report on H1] - [bounty amount]
-- [Another similar report] - [bounty amount]
+**HackerOne Cross-Reference** (REQUIRED - MUST INCLUDE)
+- Read the relevant TOP*.md file from h1-reports/tops_by_bug_type/
+- Include at least 2-3 specific H1 reports with bounty amounts
+- Example: [PayPal IDOR #415081](https://hackerone.com/reports/415081) - $10,500
 
 ---
 
