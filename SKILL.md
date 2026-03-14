@@ -1,7 +1,7 @@
 ---
 name: security-review
-description: Comprehensive security vulnerability analysis - matches Claude Code /security-review methodology with parallel agent execution and false positive filtering
-version: 3.0.0
+description: Comprehensive security vulnerability analysis - matches Claude Code /security-review methodology with parallel agent execution, false positive filtering, and HackerOne cross-reference
+version: 3.2.0
 author: security-review
 tags: [security, vulnerability, SAST, bug-bounty, AI]
 tools: [Bash, Read, Glob, Grep, call_omo_agent]
@@ -22,6 +22,15 @@ Perform comprehensive security review to identify HIGH-CONFIDENCE vulnerabilitie
 ---
 
 ## Phase 1: Repository Context Research
+
+**IMPORTANT**: Clone fresh HackerOne reports for each scan to get latest data:
+
+```bash
+# Clone or update HackerOne reports (run fresh each time for latest data)
+cd /home/kali
+rm -rf h1-reports
+git clone --depth 1 https://github.com/reddelexc/hackerone-reports.git h1-reports
+```
 
 Before analyzing, understand the codebase:
 
@@ -228,3 +237,67 @@ For each CONFIRMED vulnerability, provide:
 - **FOCUS ON IMPACT**: Prioritize vulnerabilities leading to data breach, RCE, or auth bypass
 - **PARALLEL IS FASTER**: Launch multiple grep searches simultaneously
 - **MANUAL VERIFY**: Read the actual code to confirm vulnerability before reporting
+
+---
+
+## Phase 6: HackerOne Cross-Reference (OPTIONAL)
+
+When you find a vulnerability, cross-reference with REAL HackerOne reports to:
+
+1. **Validate** - Confirm the vulnerability type is exploitable
+2. **Get context** - See what similar issues paid
+3. **Generate payload ideas** - Learn from real PoCs
+
+### HackerOne Reports Location
+```
+/home/kali/Downloads/hackerone-reports/tops_by_bug_type/
+```
+
+### Mapping Vulnerability Types to Files
+
+| Vulnerability | HackerOne File |
+|--------------|----------------|
+| SQL Injection | `TOPSQLI.md` |
+| XSS | `TOPXSS.md` |
+| IDOR | `TOPIDOR.md` |
+| SSRF | `TOPSSRF.md` |
+| RCE | `TOPRCE.md` |
+| XXE | `TOPXXE.md` |
+| CSRF | `TOPCSRF.md` |
+| Business Logic | `TOPBUSINESSLOGIC.md` |
+| Account Takeover | `TOPACCOUNTTAKEOVER.md` |
+| Auth Bypass | `TOPAUTH.md` |
+| Authorization | `TOPAUTHORIZATION.md` |
+| Open Redirect | `TOPOPENREDIRECT.md` |
+| Subdomain Takeover | `TOPSUBDOMAINTAKEOVER.md` |
+| Race Condition | `TOPRACECONDITION.md` |
+| File Upload | `TOPUPLOAD.md` |
+| Information Disclosure | `TOPINFODISCLOSURE.md` |
+| REST API | `TOPAPI.md` |
+| GraphQL | `TOPGRAPHQL.md` |
+| HTTP Request Smuggling | `TOPREQUESTSMUGGLING.md` |
+| SSTI | `TOPSSTI.md` |
+| Mobile | `TOPMOBILE.md` |
+| Clickjacking | `TOPCLICKJACKING.md` |
+
+### Example Usage
+
+When you find an IDOR vulnerability, read the TOPIDOR.md file:
+```
+Read /home/kali/h1-reports/tops_by_bug_type/TOPIDOR.md
+```
+
+Then include in your report:
+```
+### HackerOne Cross-Reference
+Similar IDOR vulnerabilities that paid:
+- [Report #1234] - $5000 - Company X paid for IDOR on /api/user/{id}
+- [Report #5678] - $3000 - Company Y paid for IDOR on /api/balance
+```
+
+### Bug Bounty Value Assessment
+
+Use HackerOne data to assess if your finding is valuable:
+- Check if similar issues paid in your target's program
+- Look at bounty ranges for that vulnerability type
+- Identify if the target accepts that category
