@@ -5,3 +5,6 @@ semgrep-results.json
 codeql-db/
 codeql-results.sarif
 npm-audit.json
+
+# HackerOne reports - cloned separately
+h1-reports/

@@ -1,7 +1,7 @@
 ---
 name: security-review
 description: Comprehensive security vulnerability analysis - matches Claude Code /security-review methodology with parallel agent execution, false positive filtering, and HackerOne cross-reference
-version: 3.4.0
+version: 3.5.0
 author: security-review
 tags: [security, vulnerability, SAST, bug-bounty, AI]
 tools: [Bash, Read, Glob, Grep, call_omo_agent]
@@ -27,21 +27,14 @@ Perform comprehensive security review to identify HIGH-CONFIDENCE vulnerabilitie
 
 ```bash
 # Clone or update HackerOne reports (run fresh each time for latest data)
-cd /home/kali
+cd ~/.config/kilo/skills/security-review/h1-reports
 
-# Smart clone - only update if needed (max once per week)
-H1_DIR="/home/kali/h1-reports"
-if [ -d "$H1_DIR/.git" ]; then
-    # Check last update time
-    LAST_UPDATE=$(stat -c %Y "$H1_DIR/.git/FETCH_HEAD" 2>/dev/null || echo 0)
-    NOW=$(date +%s)
-    DAYS=$(( (NOW - LAST_UPDATE) / 86400 ))
-    if [ "$DAYS" -gt 7 ]; then
-        rm -rf "$H1_DIR"
-        git clone --depth 1 https://github.com/reddelexc/hackerone-reports.git "$H1_DIR"
-    fi
+# Smart update - git pull if exists, else clone
+if [ -d ".git" ]; then
+    git pull origin master 2>/dev/null || echo "Already up to date"
 else
-    git clone --depth 1 https://github.com/reddelexc/hackerone-reports.git "$H1_DIR"
+    # First time - clone
+    git clone --depth 1 https://github.com/reddelexc/hackerone-reports.git .
 fi
 ```
 
@@ -346,7 +339,7 @@ When you find a vulnerability, cross-reference with REAL HackerOne reports to:
 
 When you find an IDOR vulnerability, read the TOPIDOR.md file:
 ```
-Read /home/kali/h1-reports/tops_by_bug_type/TOPIDOR.md
+Read ~/.config/kilo/skills/security-review/h1-reports/tops_by_bug_type/TOPIDOR.md
 ```
 
 Then include in your report:
