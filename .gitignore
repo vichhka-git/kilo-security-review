@@ -1,0 +1,7 @@
+.DS_Store
+node_modules/
+*.log
+semgrep-results.json
+codeql-db/
+codeql-results.sarif
+npm-audit.json
