@@ -1,19 +1,17 @@
 # Kilo Security Review Skill
 
-AI-powered security vulnerability scanner for Kilo CLI with three-layer analysis:
-1. **Semgrep** - Fast pattern matching
-2. **CodeQL** - Deep semantic analysis  
-3. **YOU (the AI)** - Analyze findings, find logic flaws, identify attack chains
+AI-powered security vulnerability scanner for Kilo CLI - matches Claude Code /security-review methodology.
 
 ## Features
 
-- 🔍 **Bug Bounty Focused** - Designed to find exploitable vulnerabilities
-- 🏴‍☠️ **IDOR Detection** - Insecure Direct Object Reference scanning
-- ⚡ **SSRF Detection** - Server-Side Request Forgery scanning
-- 🔑 **Secret Detection** - Hardcoded API keys, passwords, tokens
-- 🧠 **Direct Analysis** - YOU analyze results, no context loss
-- 🎯 **Attack Chain Analysis** - Identify how vulnerabilities can be chained
-- ⚡ **Single Session** - Complete scan without re-running
+- 🔍 **Comprehensive** - Full project security scan (not just git diffs)
+- 🤖 **Parallel Scanning** - Multiple agents scan different vulnerability types simultaneously
+- 🎯 **False Positive Filtering** - Excludes theoretical issues, focuses on real exploits
+- 📊 **Confidence Scoring** - Rate findings 1-10, report only 7+
+- 🔒 **Mobile Security** - Android & iOS specific checks
+- 🏴‍☠️ **Bug Bounty Focus** - Find exploitable vulnerabilities
+- ⚡ **Fast** - Grep-based scanning (no external tools required)
+- 🆓 **FREE** - No paid subscriptions needed
 
 ## Requirements
 
@@ -80,26 +78,32 @@ kilocode run "Perform security vulnerability scan on this codebase"
 kilocode --model kilo/kilo-auto/free run "Security review for vulnerabilities"
 ```
 
-## Three-Layer Analysis
+## Methodology (5 Phases)
 
-### Layer 1: Semgrep (Fast Pattern Scan)
-- OWASP Top 10 detection
-- Known vulnerability patterns
-- CWE coverage
+### Phase 1: Repository Context
+- Map directory structure
+- Identify technologies & frameworks
+- Map trust boundaries
 
-### Layer 2: CodeQL (Deep Semantic)
-- Data flow analysis
-- Taint tracking
-- Custom query support
+### Phase 2: Parallel Vulnerability Scanning
+- Agent 1: Input Validation (SQLi, Command Injection, XXE)
+- Agent 2: Auth & Authorization (JWT, Session, IDOR)
+- Agent 3: Secrets & Crypto (Hardcoded, Weak Crypto)
+- Agent 4: Injection & Code Execution (RCE, Pickle, XSS)
+- Agent 5: Data Exposure (Logging, PII, Debug Info)
+- Agent 6: Mobile (Android/iOS specific)
 
-### Layer 3: YOU Analyze (Direct)
-After Layers 1 & 2 complete:
-- YOU parse the results
-- YOU use grep/ast_grep to find what tools missed
-- YOU identify attack chains
-- YOU provide the final report
+### Phase 3: Vulnerability Assessment
+- Exploitability analysis
+- Impact assessment
+- Confidence scoring (1-10)
 
-No context loss - everything stays in one session!
+### Phase 4: False Positive Filtering
+- Excludes DOS, rate limiting, theoretical issues
+- Assumes safe: env vars, UUIDs, client-side validation
+
+### Phase 5: Report Synthesis
+- Structured output with severity & recommendations
 
 ## Output Example
 
