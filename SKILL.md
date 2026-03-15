@@ -7,7 +7,7 @@ tags: [security, vulnerability, SAST, bug-bounty, AI]
 tools: [Bash, Read, Glob, Grep, call_omo_agent]
 ---
 
-# Security Review Skill - v3.0.0
+# Security Review Skill - v3.7.0
 
 You are a senior security engineer. Your goal is comprehensive security vulnerability analysis.
 
