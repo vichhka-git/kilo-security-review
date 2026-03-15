@@ -66,15 +66,15 @@ cd kilo-security-review
 ```
 
 The installer detects your environment and copies the skill to the right location:
-- Kilo CLI → `~/.kilo/skills/kilo-security-review/` or `~/.config/kilo/skills/`
+- Kilo CLI → `~/.kilocode/skills/kilo-security-review/`
 - OpenCode → `~/.opencode/skills/kilo-security-review/`
 
 ### Option B — Manual Install
 
 ```bash
 # For Kilo CLI
-mkdir -p ~/.kilo/skills/kilo-security-review
-cp -r SKILL.md references/ ~/.kilo/skills/kilo-security-review/
+mkdir -p ~/.kilocode/skills/kilo-security-review
+cp -r SKILL.md references/ ~/.kilocode/skills/kilo-security-review/
 
 # For OpenCode
 mkdir -p ~/.opencode/skills/kilo-security-review
