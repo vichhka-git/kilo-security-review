@@ -1,17 +1,17 @@
 ---
 name: kilo-security-review
 description: >
-  Full-stack security review skill that produces pentest-grade reports with
-  CVSS scores, HackerOne bug-bounty references, working exploit PoCs, and
-  concrete code fixes. Use this skill whenever the user asks to: audit code,
-  security review a repo or file, find vulnerabilities, run a pentest or
-  security scan, check OWASP Top 10 / API Top 10 / Mobile Top 10, do a bug
-  bounty recon, conduct a threat model, review code before a release, look for
-  SQLi / XSS / SSRF / IDOR / RCE / auth bypass, investigate a CVE, or ask
-  "is this code secure?". Works on web, API, mobile (Android + iOS + React Native),
-  cloud/IaC, and full-stack projects. Always use this skill — it prevents
-  false positives, enforces PoC-backed findings, and produces reports that match
-  professional pentest quality.
+  Full-stack security review skill for Kilo CLI and OpenCode that produces
+  pentest-grade reports with CVSS scores, HackerOne bug-bounty references,
+  working exploit PoCs, and concrete code fixes. Use this skill whenever the
+  user asks to: audit code, security review a repo or file, find vulnerabilities,
+  run a pentest or security scan, check OWASP Top 10 / API Top 10 / Mobile Top 10,
+  do a bug bounty recon, conduct a threat model, review code before a release,
+  look for SQLi / XSS / SSRF / IDOR / RCE / auth bypass, investigate a CVE,
+  or ask "is this code secure?". Works on web, API, mobile (Android + iOS +
+  React Native), cloud/IaC, and full-stack projects. Always use this skill —
+  it prevents false positives, enforces PoC-backed findings, and produces
+  reports that match professional pentest quality.
 ---
 
 # Kilo Security Review
@@ -41,7 +41,14 @@ ls -la
 git log --all --full-history -- '*.env' '.env' '*.pem' '*.key' '*.pfx' '*.p12'
 git log --all --full-history --grep='password\|secret\|token\|api.key' -i
 
-# 3. Secret scanning tools
+# 3. Update HackerOne reports database (local, fast, no web fetch)
+if [[ -d "../kilo-security-review/references/hackerone-reports" ]]; then
+  (cd ../kilo-security-review/references/hackerone-reports && git pull -q) 2>/dev/null || true
+elif [[ -d "references/hackerone-reports" ]]; then
+  (cd references/hackerone-reports && git pull -q) 2>/dev/null || true
+fi
+
+# 4. Secret scanning tools
 gitleaks detect --source . --verbose 2>/dev/null || true
 grep -rE 'eyJ[A-Za-z0-9._-]{20,}' . --include='*.{js,ts,py,java,kt,swift,go,rb}' 2>/dev/null
 ```
@@ -52,6 +59,7 @@ grep -rE 'eyJ[A-Za-z0-9._-]{20,}' . --include='*.{js,ts,py,java,kt,swift,go,rb}'
 - iOS → `references/ios.md`
 - Cloud / Infra / IaC → `references/cloud-infra.md`
 - Any stack → `references/secrets-and-config.md` ← always read this
+- HackerOne references → `references/hackerone-reports/tops_by_bug_type/*.md`
 
 ---
 
@@ -261,18 +269,36 @@ user = db.execute(
 For every HIGH+ finding, link a matching disclosed H1 report.
 Format: `[Short description](https://hackerone.com/reports/XXXXXX) — $X,000`
 
-| Bug Class | H1 Category to Search |
-|---|---|
-| SQL Injection | `sql-injection` — highest: RCE-capable SQLi |
-| SSRF | `ssrf` — cloud metadata exfil reports |
-| IDOR / BOLA | `idor` — mass account access |
-| Hardcoded secrets | `hardcoded-credentials`, `exposed-secret` |
-| Auth bypass | `authentication-bypass` |
-| RCE | `remote-code-execution` — top payouts |
-| Stored XSS | `xss` filtered to `stored` |
-| Mobile secrets | `mobile`, `apk`, `hardcoded` |
+**Use local H1 reports for fast lookup** — no web fetch needed:
 
-Reference DB: https://github.com/reddelexc/hackerone-reports
+```bash
+# By bug type - read the markdown files with top reports
+cat references/hackerone-reports/tops_by_bug_type/TOPSQLI.md
+cat references/hackerone-reports/tops_by_bug_type/TOPXSS.md
+cat references/hackerone-reports/tops_by_bug_type/TOPRCE.md
+cat references/hackerone-reports/tops_by_bug_type/TOPIDOR.md
+
+# By program/company
+cat references/hackerone-reports/tops_by_program/TOPSHOPIFY.md
+cat references/hackerone-reports/tops_by_program/TOPUBER.md
+
+# Top paid reports
+cat references/hackerone-reports/tops_100/TOP100PAID.md
+```
+
+| Bug Type | File |
+|---|---|
+| SQL Injection | `references/hackerone-reports/tops_by_bug_type/TOPSQLI.md` |
+| XSS | `references/hackerone-reports/tops_by_bug_type/TOPXSS.md` |
+| SSRF | `references/hackerone-reports/tops_by_bug_type/TOPSSRF.md` |
+| IDOR | `references/hackerone-reports/tops_by_bug_type/TOPIDOR.md` |
+| RCE | `references/hackerone-reports/tops_by_bug_type/TOPRCE.md` |
+| XXE | `references/hackerone-reports/tops_by_bug_type/TOPXXE.md` |
+| Auth bypass | `references/hackerone-reports/tops_by_bug_type/TOPAUTH.md` |
+| Business Logic | `references/hackerone-reports/tops_by_bug_type/TOPBUSINESSLOGIC.md` |
+| Mobile | `references/hackerone-reports/tops_by_bug_type/TOPMOBILE.md` |
+
+Local DB: `references/hackerone-reports/tops_by_bug_type/` and `references/hackerone-reports/tops_by_program/`
 
 ---
 
