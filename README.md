@@ -77,8 +77,8 @@ mkdir -p ~/.kilocode/skills/kilo-security-review
 cp -r SKILL.md references/ ~/.kilocode/skills/kilo-security-review/
 
 # For OpenCode
-mkdir -p ~/.opencode/skills/kilo-security-review
-cp -r SKILL.md references/ ~/.opencode/skills/kilo-security-review/
+mkdir -p ~/.config/opencode/skills/kilo-security-review
+cp -r SKILL.md references/ ~/.config/opencode/skills/kilo-security-review/
 ```
 
 ---
