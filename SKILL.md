@@ -59,7 +59,15 @@ grep -rE 'eyJ[A-Za-z0-9._-]{20,}' . --include='*.{js,ts,py,java,kt,swift,go,rb}'
 - iOS → `references/ios.md`
 - Cloud / Infra / IaC → `references/cloud-infra.md`
 - Any stack → `references/secrets-and-config.md` ← always read this
-- HackerOne references → `references/hackerone-reports/tops_by_bug_type/*.md`
+- **ALWAYS read HackerOne references** for the bug types found:
+  - SQLi → `references/hackerone-reports/tops_by_bug_type/TOPSQLI.md`
+  - XSS → `references/hackerone-reports/tops_by_bug_type/TOPXSS.md`
+  - SSRF → `references/hackerone-reports/tops_by_bug_type/TOPSSRF.md`
+  - IDOR → `references/hackerone-reports/tops_by_bug_type/TOPIDOR.md`
+  - RCE → `references/hackerone-reports/tops_by_bug_type/TOPRCE.md`
+  - Auth bypass → `references/hackerone-reports/tops_by_bug_type/TOPAUTH.md`
+  - Mobile → `references/hackerone-reports/tops_by_bug_type/TOPMOBILE.md`
+  - For all bug types → `references/hackerone-reports/tops_by_bug_type/`
 
 ---
 
@@ -266,25 +274,26 @@ user = db.execute(
 
 ## Phase 6 — HackerOne Cross-Reference
 
-For every HIGH+ finding, link a matching disclosed H1 report.
+**MUST read local H1 reports for every HIGH+ finding** — no web fetch needed.
+
+For every HIGH+ finding, link a matching disclosed H1 report from the local database.
 Format: `[Short description](https://hackerone.com/reports/XXXXXX) — $X,000`
 
-**Use local H1 reports for fast lookup** — no web fetch needed:
+**Read the relevant H1 files and extract matching reports:**
 
 ```bash
-# By bug type - read the markdown files with top reports
+# Read the H1 files for bug types found in this review
 cat references/hackerone-reports/tops_by_bug_type/TOPSQLI.md
 cat references/hackerone-reports/tops_by_bug_type/TOPXSS.md
 cat references/hackerone-reports/tops_by_bug_type/TOPRCE.md
 cat references/hackerone-reports/tops_by_bug_type/TOPIDOR.md
+cat references/hackerone-reports/tops_by_bug_type/TOPSSRF.md
 
-# By program/company
-cat references/hackerone-reports/tops_by_program/TOPSHOPIFY.md
-cat references/hackerone-reports/tops_by_program/TOPUBER.md
-
-# Top paid reports
+# Also check top paid reports
 cat references/hackerone-reports/tops_100/TOP100PAID.md
 ```
+
+**Then for each finding, include an H1 reference from those files.**
 
 | Bug Type | File |
 |---|---|
