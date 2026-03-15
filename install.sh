@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # kilo-security-review installer
-# Supports: Kilo CLI, OpenCode
-# Usage: ./install.sh [--target kilo|opencode]
+# Supports: Claude Code, Kilo CLI, OpenCode, and manual .skill install
+# Usage: ./install.sh [--target claude|kilo|opencode|skill]
 
 set -euo pipefail
 
@@ -23,11 +23,12 @@ header "Kilo Security Review — Installer"
 echo "  Source: $SCRIPT_DIR"
 
 # ── parse flags ───────────────────────────────────────────────────────────────
-TARGET="${1:-auto}"   # auto | kilo | opencode
+TARGET="${1:-auto}"   # auto | claude | kilo | opencode | skill
 
 # ── detect available runtimes ─────────────────────────────────────────────────
 detect_runtimes() {
   RUNTIMES=()
+  [[ -d "$HOME/.claude"    ]] && RUNTIMES+=("claude")
   command -v kilo    &>/dev/null && RUNTIMES+=("kilo")
   command -v kilocode &>/dev/null && RUNTIMES+=("kilo")
   command -v opencode &>/dev/null && RUNTIMES+=("opencode")
@@ -75,6 +76,24 @@ determine_target
 
 # ── install functions ─────────────────────────────────────────────────────────
 
+install_claude_code() {
+  local dest="$HOME/.claude/skills/$SKILL_NAME"
+  header "Installing to Claude Code: $dest"
+
+  mkdir -p "$dest/references"
+  cp "$SCRIPT_DIR/SKILL.md"     "$dest/SKILL.md"
+  cp "$SCRIPT_DIR/references/"*.md "$dest/references/" 2>/dev/null || true
+
+  success "Installed to $dest"
+  echo ""
+  echo "  Usage in Claude Code:"
+  echo "    Claude will use this skill automatically when you ask for a security review."
+  echo "    Or explicitly: 'Run a security review on this project'"
+  echo ""
+  echo "  To verify:"
+  echo "    ls $dest"
+}
+
 install_kilo() {
   # Support both ~/.kilo/skills and ~/.config/kilo/skills
   local dest
@@ -84,13 +103,6 @@ install_kilo() {
     dest="$HOME/.config/kilo/skills/$SKILL_NAME"
   else
     dest="$HOME/.kilo/skills/$SKILL_NAME"
-  fi
-
-  header "Cloning HackerOne reports database..."
-  if [[ ! -d "$SCRIPT_DIR/references/hackerone-reports" ]]; then
-    git clone --depth 1 https://github.com/reddelexc/hackerone-reports.git "$SCRIPT_DIR/references/hackerone-reports" 2>/dev/null || {
-      warn "Failed to clone H1 reports. Install will continue without local H1 data."
-    }
   fi
 
   header "Installing to Kilo CLI: $dest"
@@ -107,19 +119,11 @@ install_kilo() {
 
 install_opencode() {
   local dest="$HOME/.opencode/skills/$SKILL_NAME"
-
-  header "Cloning HackerOne reports database..."
-  if [[ ! -d "$SCRIPT_DIR/references/hackerone-reports" ]]; then
-    git clone --depth 1 https://github.com/reddelexc/hackerone-reports.git "$SCRIPT_DIR/references/hackerone-reports" 2>/dev/null || {
-      warn "Failed to clone H1 reports. Install will continue without local H1 data."
-    }
-  fi
-
   header "Installing to OpenCode: $dest"
 
   mkdir -p "$dest/references"
   cp "$SCRIPT_DIR/SKILL.md"         "$dest/SKILL.md"
-  cp "$SCRIPT_DIR/references/"*.md   "$dest/references/" 2>/dev/null || true
+  cp "$SCRIPT_DIR/references/"*.md  "$dest/references/" 2>/dev/null || true
 
   success "Installed to $dest"
   echo ""
@@ -127,7 +131,28 @@ install_opencode() {
   echo "    Start a session and ask: 'Security review this project for bug bounties'"
 }
 
+build_skill_file() {
+  local output="$SCRIPT_DIR/$SKILL_NAME.skill"
+  header "Building .skill file: $output"
 
+  if ! command -v zip &>/dev/null; then
+    error "zip not found. Please install zip and re-run."
+    exit 1
+  fi
+
+  cd "$SCRIPT_DIR"
+  rm -f "$output"
+  zip -r "$output" SKILL.md README.md references/ \
+    --exclude "*.DS_Store" --exclude "*__pycache__*" -q
+
+  success "Built: $output ($(du -sh "$output" | cut -f1))"
+  echo ""
+  echo "  Install with:"
+  echo "    npx skills install $SKILL_NAME.skill"
+  echo ""
+  echo "  Or for Claude.ai: copy SKILL.md into your Project instructions"
+  echo "    and add reference files as Project documents."
+}
 
 # ── optional tools check ──────────────────────────────────────────────────────
 check_optional_tools() {
@@ -184,6 +209,10 @@ verify_install() {
 # ── run ───────────────────────────────────────────────────────────────────────
 
 case "$INSTALL_TARGET" in
+  claude)
+    install_claude_code
+    verify_install "$HOME/.claude/skills/$SKILL_NAME"
+    ;;
   kilo)
     install_kilo
     if [[ -d "$HOME/.kilo" ]]; then
@@ -196,8 +225,11 @@ case "$INSTALL_TARGET" in
     install_opencode
     verify_install "$HOME/.opencode/skills/$SKILL_NAME"
     ;;
+  skill)
+    build_skill_file
+    ;;
   *)
-    error "Unknown target: $INSTALL_TARGET. Valid values: kilo, opencode"
+    error "Unknown target: $INSTALL_TARGET. Valid values: claude, kilo, opencode, skill"
     exit 1
     ;;
 esac
@@ -206,13 +238,11 @@ check_optional_tools
 
 header "Done"
 echo ""
-  echo "  The skill teaches the AI to:"
+echo "  The skill teaches Claude to:"
 echo "    • Trace data flow source→sink before reporting any vulnerability"
 echo "    • Require a working PoC for every HIGH+ finding"
 echo "    • Link each finding to a real HackerOne bug-bounty report"
 echo "    • Apply CVSS 3.1 scoring to Critical and High findings"
 echo "    • Load only the reference files relevant to your stack"
 echo ""
-  echo "  Full docs: https://github.com/vichhka-git/kilo-security-review"
-  echo ""
-  echo "  Note: This skill is for Kilo CLI and OpenCode only."
+echo "  Full docs: https://github.com/vichhka-git/kilo-security-review"
