@@ -1,394 +1,287 @@
 ---
-name: security-review
-description: Comprehensive security vulnerability analysis - matches Claude Code /security-review methodology with parallel agent execution, false positive filtering, and HackerOne cross-reference
-version: 3.7.0
-author: security-review
-tags: [security, vulnerability, SAST, bug-bounty, AI]
-tools: [Bash, Read, Glob, Grep, call_omo_agent]
+name: kilo-security-review
+description: >
+  Full-stack security review skill that produces pentest-grade reports with
+  CVSS scores, HackerOne bug-bounty references, working exploit PoCs, and
+  concrete code fixes. Use this skill whenever the user asks to: audit code,
+  security review a repo or file, find vulnerabilities, run a pentest or
+  security scan, check OWASP Top 10 / API Top 10 / Mobile Top 10, do a bug
+  bounty recon, conduct a threat model, review code before a release, look for
+  SQLi / XSS / SSRF / IDOR / RCE / auth bypass, investigate a CVE, or ask
+  "is this code secure?". Works on web, API, mobile (Android + iOS + React Native),
+  cloud/IaC, and full-stack projects. Always use this skill — it prevents
+  false positives, enforces PoC-backed findings, and produces reports that match
+  professional pentest quality.
 ---
 
-# Security Review Skill - v3.7.0
+# Kilo Security Review
 
-You are a senior security engineer. Your goal is comprehensive security vulnerability analysis.
+You are a senior penetration tester and AppSec engineer. Your reviews are
+exploit-driven and evidence-backed — not checklists. Every finding must have a
+working proof-of-concept and a real code fix. False positives are worse than
+missed findings.
 
-## Key Difference from v2.x
-
-v3.0 uses **parallel agent execution** and **false positive filtering** - matching Claude Code's methodology.
-
-## Objective
-
-Perform comprehensive security review to identify HIGH-CONFIDENCE vulnerabilities with real exploitation potential.
+**Non-negotiable rule:** You MUST trace data flow from source to sink before
+reporting any vulnerability at HIGH or CRITICAL confidence. If you cannot
+confirm that the input is attacker-controlled all the way to the dangerous
+sink, the finding is MEDIUM at most.
 
 ---
 
-## Phase 1: Repository Context Research
+## Phase 0 — Scope, Triage & Git History
 
-**IMPORTANT**: FIRST, before scanning, update HackerOne reports:
+Do this before touching any code:
 
 ```bash
-# Run this FIRST - update H1 reports
-cd ~/.config/kilo/skills/security-review/h1-reports && git pull origin master
-```
-
-**CRITICAL - YOU MUST USE H1 DATA:**
-For each vulnerability type found, IMMEDIATELY read the relevant H1 report file:
-- SQLi → Read ~/.config/kilo/skills/security-review/h1-reports/tops_by_bug_type/TOPSQLI.md
-- XSS → Read ~/.config/kilo/skills/security-review/h1-reports/tops_by_bug_type/TOPXSS.md
-- IDOR → Read ~/.config/kilo/skills/security-review/h1-reports/tops_by_bug_type/TOPIDOR.md
-- SSRF → Read ~/.config/kilo/skills/security-review/h1-reports/tops_by_bug_type/TOPSSRF.md
-- Auth → Read ~/.config/kilo/skills/security-review/h1-reports/tops_by_bug_type/TOPAUTH.md
-- Mobile → Read ~/.config/kilo/skills/security-review/h1-reports/tops_by_bug_type/TOPMOBILE.md
-- SSRF → Read TOPSSRF.md
-- RCE → Read TOPRCE.md
-- etc.
-
-Then include specific H1 report examples in your findings with bounty amounts.
-
-Before analyzing, understand the codebase:
-
-1. **Map directory structure:**
-```bash
+# 1. Map the repo structure
+find . -name "*.env" -o -name "*.pem" -o -name "*.key" -o -name "*.p12" | head -30
 ls -la
-Glob "**/*"
+
+# 2. Scan git history for committed secrets (Critical if found — do this FIRST)
+git log --all --full-history -- '*.env' '.env' '*.pem' '*.key' '*.pfx' '*.p12'
+git log --all --full-history --grep='password\|secret\|token\|api.key' -i
+
+# 3. Secret scanning tools
+gitleaks detect --source . --verbose 2>/dev/null || true
+grep -rE 'eyJ[A-Za-z0-9._-]{20,}' . --include='*.{js,ts,py,java,kt,swift,go,rb}' 2>/dev/null
 ```
 
-2. **Identify technologies:**
+**Stack-based reference loading** — read ONLY what's relevant:
+- Web / API → `references/web-api.md`
+- Android → `references/android.md`
+- iOS → `references/ios.md`
+- Cloud / Infra / IaC → `references/cloud-infra.md`
+- Any stack → `references/secrets-and-config.md` ← always read this
+
+---
+
+## Phase 1 — Automated Scanning
+
+Run tools appropriate to the detected stack. Do not skip — tools catch what
+humans miss, humans catch what tools miss.
+
+### Secrets & Credentials
 ```bash
-ls -la | grep -E "package.json|requirements.txt|go.mod|Cargo.toml|pom.xml|*.csproj|composer.json"
+gitleaks detect --source . --verbose
+trufflehog git file://. --only-verified 2>/dev/null
+grep -rE '(password|secret|api_key|auth_token)\s*[:=]\s*["\x27][^"'\'']{8,}' \
+  . --include='*.{py,js,ts,java,kt,swift,rb,go,env,yaml,yml,json}' -i
 ```
 
-3. **Identify frameworks & security libraries:**
-- What web frameworks? (Express, Flask, Django, Gin, Spring)
-- What auth is used? (JWT, Session, OAuth)
-- What databases? (SQL, NoSQL)
-
-4. **Map trust boundaries:**
-- Where does client trust server?
-- Where does server trust client?
-- What crosses network unencrypted?
-
----
-
-## Phase 2: Parallel Vulnerability Scanning
-
-Launch MULTIPLE parallel searches for different vulnerability categories:
-
-### Agent 1: Input Validation Vulnerabilities
-- SQL injection (string concatenation in queries)
-- Command injection (exec, spawn, system calls)
-- XXE injection (XML parsing)
-- Template injection (Jinja2, Handlebars)
-- NoSQL injection
-- Path traversal (file operations with user input)
-
-**Search patterns:**
-```
-grep -rn "SELECT.*+|INSERT.*+|UPDATE.*+|DELETE.*+" --include="*.py" --include="*.js" --include="*.ts"
-grep -rn "exec\(|spawn\(|system\(|os\.system" --include="*.py" --include="*.js" --include="*.go"
-grep -rn "open\(|read\(|file" --include="*.py" --include="*.js" | grep -v "test"
+### Language-Specific SAST
+```bash
+bandit -r . -ll 2>/dev/null                                   # Python
+semgrep --config p/java --config p/kotlin . 2>/dev/null       # Java/Kotlin
+gosec ./... 2>/dev/null                                        # Go
+semgrep --config p/owasp-top-ten . 2>/dev/null                # Fallback all
 ```
 
-### Agent 2: Authentication & Authorization
-- Authentication bypass logic
-- Privilege escalation paths
-- Session management flaws
-- JWT vulnerabilities (no expiry, weak secret, algorithm confusion)
-- Authorization bypasses (IDOR, BOLA)
-- Mass Assignment (arbitrary field injection)
-- Weak PIN/password reset mechanisms
-- File upload validation bypasses
-
-**Search patterns:**
-```
-# Mass Assignment
-grep -rn "for.*key.*in.*data|for.*k.*v.*items|\.update\(" --include="*.py" --include="*.js"
-grep -rn "is_admin|role|permission" --include="*.py" | grep -v "check\|verify"
-
-# Weak PIN/password reset
-grep -rn "randint.*999|random.*pin|pin.*=" --include="*.py"
-grep -rn "forgot.*password|reset.*pin" --include="*.py"
-
-# File upload
-grep -rn "file\.save|upload|filename" --include="*.py" | grep -v "secure_filename\|validate"
-
-# JWT issues
-grep -rn "jwt\.|JWT" --include="*.py" --include="*.js"
-grep -rn "session|cookie|token" --include="*.py" --include="*.js" | grep -v "test"
-
-# Routes without auth
-grep -rn "@app.route|def " --include="*.py" | grep -v "auth\|verify\|token"
-```
-
-### Agent 3: Secrets & Cryptography
-- Hardcoded API keys, passwords, tokens
-- Weak crypto (MD5, SHA-1, DES)
-- Improper key storage
-- Certificate validation bypasses
-
-**Search patterns:**
-```
-grep -rnE "(api[_-]?key|password|secret|token)\s*=\s*['\"]" --include="*.py" --include="*.js" --include="*.java"
-grep -rnE "hashlib\.(md5|sha1)|Crypto\.Cipher" --include="*.py"
-grep -rn ".env|DATABASE_URL|JWT_SECRET|SECRET_KEY" --include="*.py" --include="*.js"
-```
-
-### Agent 4: Injection & Code Execution
-- Remote code execution (deserialization)
-- Pickle/YAML deserialization vulnerabilities
-- Eval injection
-- XSS (reflected, stored, DOM)
-
-**Search patterns:**
-```
-grep -rn "pickle\.|yaml\.load|eval\(|exec\(" --include="*.py"
-grep -rn "dangerouslySetInnerHTML|bypassSecurityTrust" --include="*.ts" --include="*.tsx"
-grep -rn "innerHTML|\.html\(" --include="*.js" --include="*.ts"
-```
-
-### Agent 5: Data Exposure
-- Sensitive data logging
-- PII handling violations
-- API data leakage
-- Debug information exposure
-
-**Search patterns:**
-```
-grep -rn "console\.log\|print\(|logger" --include="*.py" --include="*.js" --include="*.ts"
-grep -rn "debug\|trace\|error" --include="*.py" | grep -E "password|token|secret"
-grep -rn "return.*error|jsonify.*error" --include="*.py"
-```
-
-### Agent 6: Mobile-Specific (Android/iOS)
-
-**Android patterns:**
-```
-# Insecure data storage
-grep -rn "SharedPreferences|MODE_PRIVATE" --include="*.java" --include="*.kt"
-grep -rn "putString.*password|putString.*token|putString.*secret" --include="*.java" --include="*.kt"
-
-# Manifest security settings
-grep -rn "allowBackup|debuggable|usesCleartextTraffic|exported" --include="AndroidManifest.xml"
-
-# Hardcoded secrets in code
-grep -rn "password=|secret=|key=|JWT|api[_-]?key" --include="*.java" --include="*.kt"
-
-# Certificate pinning
-grep -rn "pinning|TrustManager|HostnameVerifier" --include="*.java" --include="*.kt" | grep -v "true"
-
-# ProGuard/R8 disabled
-grep -rn "minifyEnabled|proguard" --include="build.gradle" | grep -v "true"
-```
-
-**iOS patterns:**
-```
-grep -rn "UserDefaults" --include="*.swift"
-grep -rn "NSAppTransportSecurity|ATS" --include="*.plist"
-grep -rn "Keychain" --include="*.swift"
+### Dependencies
+```bash
+npm audit --audit-level=moderate 2>/dev/null   # Node
+pip-audit 2>/dev/null                          # Python
+bundle audit 2>/dev/null                       # Ruby
+govulncheck ./... 2>/dev/null                  # Go
+trivy fs . 2>/dev/null                         # Multi-language + IaC
 ```
 
 ---
 
-## Phase 3: Vulnerability Assessment
+## Phase 2 — Manual Review: Sink-Backward Analysis
 
-For each finding, assess:
+Work **sink-backward**: find dangerous sinks first, then trace the input
+upstream to confirm attacker control. Do not pattern-match forward.
 
-1. **Exploitability**: Can this be exploited? What's the attack path?
-2. **Impact**: What's the worst case? Data breach? RCE? Account takeover?
-3. **Confidence**: Rate 1-10
-   - 7-10: Report it (clear vulnerability pattern)
-   - 4-6: Flag for manual review
-   - 1-3: Skip (too speculative)
+### Dangerous Sink Table
 
----
+| Sink | Bug Class | Confirm Attacker Control? |
+|---|---|---|
+| Raw SQL string concat/format | SQL Injection | Is variable from `request.*`? |
+| `eval()`, `exec()`, `subprocess(shell=True)` | RCE | Is arg from user input? |
+| `requests.get(url)`, `fetch(url)` | SSRF | Is URL from user input? |
+| `open(path)`, `send_file(path)` | Path traversal | Is path sanitised with `realpath`? |
+| `innerHTML =`, `dangerouslySetInnerHTML` | XSS | Is value user data? |
+| `redirect(url)`, `location.href = url` | Open redirect | Is destination validated? |
+| `pickle.loads()`, `yaml.load()` | Deserialization | Is data from untrusted source? |
+| `os.system()`, `Runtime.exec()` | Command injection | Is arg sanitised? |
+| `SharedPreferences`, `UserDefaults`, `AsyncStorage` | Insecure storage | Is sensitive data written? |
+| `<meta-data android:value>`, `Info.plist` key | Hardcoded secret | Any token/password value? |
 
-## Phase 4: False Positive Filtering
+### Confirming Attacker Control (most critical step)
+Before flagging any sink, answer:
+1. Where does this variable originate? Trace it back step by step.
+2. Is it from `request.args`, `request.json`, `request.headers`, URL params,
+   uploaded file, or any cross-boundary network data?
+3. Is there any sanitisation or allowlist between the source and the sink?
 
-**EXCLUDE these findings:**
-- Denial of Service (DOS) vulnerabilities
-- Rate limiting concerns
-- Theoretical issues without clear attack path
-- Memory safety issues in memory-safe languages (Rust, Go)
-- Unit test files
-- Log spoofing concerns
-- Lack of audit logs
-- Lack of hardening measures (not a vulnerability)
+If the variable comes from `settings.py`, `config.yml`, or a server-side env var
+→ NOT attacker-controlled → do NOT report as a vulnerability.
 
-**ASSUME SAFE:**
-- Environment variables (trusted)
-- UUIDs (unguessable)
-- Client-side validation (server handles it)
-- React/Angular XSS (unless dangerouslySetInnerHTML)
-- Path-only SSRF (must control host/protocol)
+### Authorization Review
+```python
+# FLAG — no ownership check (BOLA/IDOR)
+def get_invoice(invoice_id):
+    return Invoice.query.get(invoice_id)  # any user reads any invoice
 
----
-
-## Phase 5: Comprehensive Output
-
-For each CONFIRMED vulnerability, provide a detailed report matching professional security review standards:
-
+# SAFE
+def get_invoice(invoice_id, current_user):
+    return Invoice.query.filter_by(
+        id=invoice_id,
+        owner_id=current_user.id   # ownership enforced
+    ).first_or_404()
 ```
-# [VULN #X] [Type] - `file:line`
 
-| Field | Detail |
+### Business Logic (always check)
+- Negative amount on financial endpoint? (infinite self-credit)
+- Workflow step skippable or replayable?
+- TOCTOU race on balance-check → debit?
+- OTP/reset tokens enumerable or reusable?
+
+---
+
+## Phase 3 — Confidence Classification
+
+| Level | Criteria | Report as |
+|---|---|---|
+| **HIGH** | Sink confirmed + input traced to attacker control, no sanitisation in path | Finding with PoC |
+| **MEDIUM** | Pattern found but input source unclear, or sanitisation that might be bypassable | Finding with confirmation note |
+| **LOW** | Theoretical, best-practice deviation, no realistic attack path | Info section only |
+
+**Do NOT report at HIGH:**
+- `requests.get(settings.WEBHOOK_URL)` → server config, not SSRF
+- `hashlib.md5(file_content)` for checksum → not weak password hashing
+- `{{ value }}` in Django templates → auto-escaped, not XSS
+- `Log.d("tag", "user_id=" + id)` → non-sensitive ID, not credential leak
+
+---
+
+## Phase 4 — PoC Requirement
+
+**Every HIGH and CRITICAL finding MUST have a working PoC.**
+Cannot write one → downgrade to MEDIUM.
+
+```bash
+# PoC format:
+# [VULN-ID]: [Title]
+# Precondition: [auth or setup needed]
+# Expected: [what happens if vulnerable]
+
+curl -X POST https://TARGET/api/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin'\''--", "password": "x"}'
+# Expected: 200 + admin token → auth bypass confirmed
+```
+
+---
+
+## Phase 5 — Report Format
+
+```markdown
+# Security Review: [Project Name]
+
+| Field | Value |
 |---|---|
-| **Severity** | 🔴 CRITICAL / 🟠 HIGH / 🟡 MEDIUM / 🔵 INFO |
-| **OWASP Category** | [e.g., A03:2021 - Injection] |
-| **CVSS Score** | [0.0 - 10.0] |
-| **Location** | `file:line` |
-| **Confidence** | [7-10]/10 |
+| Target | [path / URL / repo] |
+| Stack | [detected languages + frameworks] |
+| Date | [today] |
+| Findings | 🔴 X Critical · 🟠 X High · 🟡 X Medium · 🔵 X Info |
 
-**Description**
-[Brief description of the vulnerability]
-
-**Vulnerable Pattern**
-```[language]
-// Show the actual vulnerable code
-```
-
-**Impact**
-[Real-world impact - what can an attacker achieve?]
-
-**Exploitation**
-```bash
-# Show how to exploit this vulnerability
-```
-
-**Remediation**
-- Step 1 to fix
-- Step 2 to fix
-- Step 3 to fix
-
-**HackerOne Cross-Reference** (REQUIRED - MUST INCLUDE)
-- Read the relevant TOP*.md file from h1-reports/tops_by_bug_type/
-- Include at least 2-3 specific H1 reports with bounty amounts
-- Example: [PayPal IDOR #415081](https://hackerone.com/reports/415081) - $10,500
+## Executive Summary
+[3–5 sentences: what was reviewed, highest risk, root cause, top action.]
 
 ---
 
-## CVSS Scoring Reference
+## Findings
 
-Assign CVSS scores based on impact:
+### [VULN-001] [Title] — 🔴 CRITICAL
 
-| Vulnerability Type | Typical Score | Rationale |
-|-------------------|---------------|-----------|
-| SQL Injection (auth bypass) | 9.8 | Network exploit, no auth, full compromise |
-| Hardcoded JWT/secret | 9.1 | Extract from APK, forge tokens |
-| IDOR (financial) | 8.5 | Access any user's financial data |
-| Auth bypass (unauthenticated) | 8.6 | No login required |
-| Hardcoded password in code | 7.5 | Easy to find, no exploit needed |
-| Insecure storage (SharedPrefs) | 7.1 | Requires physical/ADB access |
-| Cleartext HTTP | 7.5 | Network interception possible |
-| Debug mode enabled | 6.5 | Information disclosure |
-| Missing rate limiting | 5.3 | DoS possible |
+| Field | Value |
+|---|---|
+| **Location** | `path/to/file.py:42` |
+| **CVSS 3.1** | 9.8 (AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H) |
+| **CWE** | CWE-89 — SQL Injection |
+| **OWASP** | A03:2021 Injection |
+| **Confidence** | HIGH |
+| **H1 Reference** | [SQLi → RCE at Shopify](https://hackerone.com/reports/1547858) — $25,000 |
 
-**Severity Thresholds:**
-- CRITICAL: 9.0 - 10.0
-- HIGH: 7.0 - 8.9
-- MEDIUM: 4.0 - 6.9
-- LOW: 0.1 - 3.9
-- INFO: 0.0
-```
+**What**
+[1–2 sentences: exact vulnerability and location.]
 
-## Summary Output Format
+**Why it matters**
+[Specific impact: "read any user's balance" not "data exposure".]
 
-```
-## Security Review Summary
+**Evidence**
+\```python
+# path/to/file.py:42 — username is request.json['username'], no sanitisation
+query = f"SELECT * FROM users WHERE username='{username}'"
+\```
 
-### Findings
-| Severity | Count |
-|----------|-------|
-| CRITICAL | X    |
-| HIGH     | X    |
-| MEDIUM   | X    |
-| LOW      | X    |
+**Proof of Concept**
+\```bash
+curl -X POST https://TARGET/api/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin'\''--", "password": "x"}'
+# Returns: {"token":"eyJhbGci...","is_admin":true}
+\```
 
-### By Category
-| Category | Count |
-|----------|-------|
-| SQL Injection | X |
-| Auth Bypass   | X |
-| ...           | X |
+**Fix**
+\```python
+# Parameterized — exact replacement, paste-ready
+user = db.execute(
+    text("SELECT * FROM users WHERE username = :u AND password_hash = :p"),
+    {"u": username, "p": hash_password(password)}
+).fetchone()
+\```
 
-### Top Exploitable
-1. [Finding 1]
-2. [Finding 2]
-3. [Finding 3]
+---
 
-### Recommendations
-1. Fix [Critical]
-2. Fix [High]
-3. Fix [Medium]
+## OWASP Coverage Matrix
+[Table mapping each finding to OWASP Web/API/Mobile category]
+
+## Remediation Roadmap
+### Immediate (before next deploy)
+- [ ] VULN-001: [Action]
+### Short-term (this sprint)
+- [ ] VULN-003: [Action]
+### Medium-term
+- [ ] VULN-005: [Action]
+
+## Tools Run
+| Tool | Result |
+|---|---|
+| gitleaks | [X secrets / clean] |
+| semgrep | [X findings] |
+| npm audit | [X vulnerabilities] |
 ```
 
 ---
 
-## Notes
+## Phase 6 — HackerOne Cross-Reference
 
-- **MINIMIZE NOISE**: Better to miss theoretical issues than flood with false positives
-- **FOCUS ON IMPACT**: Prioritize vulnerabilities leading to data breach, RCE, or auth bypass
-- **PARALLEL IS FASTER**: Launch multiple grep searches simultaneously
-- **MANUAL VERIFY**: Read the actual code to confirm vulnerability before reporting
+For every HIGH+ finding, link a matching disclosed H1 report.
+Format: `[Short description](https://hackerone.com/reports/XXXXXX) — $X,000`
+
+| Bug Class | H1 Category to Search |
+|---|---|
+| SQL Injection | `sql-injection` — highest: RCE-capable SQLi |
+| SSRF | `ssrf` — cloud metadata exfil reports |
+| IDOR / BOLA | `idor` — mass account access |
+| Hardcoded secrets | `hardcoded-credentials`, `exposed-secret` |
+| Auth bypass | `authentication-bypass` |
+| RCE | `remote-code-execution` — top payouts |
+| Stored XSS | `xss` filtered to `stored` |
+| Mobile secrets | `mobile`, `apk`, `hardcoded` |
+
+Reference DB: https://github.com/reddelexc/hackerone-reports
 
 ---
 
-## Phase 6: HackerOne Cross-Reference (OPTIONAL)
+## Output Rules
 
-When you find a vulnerability, cross-reference with REAL HackerOne reports to:
-
-1. **Validate** - Confirm the vulnerability type is exploitable
-2. **Get context** - See what similar issues paid
-3. **Generate payload ideas** - Learn from real PoCs
-
-### HackerOne Reports Location
-```
-/home/kali/Downloads/hackerone-reports/tops_by_bug_type/
-```
-
-### Mapping Vulnerability Types to Files
-
-| Vulnerability | HackerOne File |
-|--------------|----------------|
-| SQL Injection | `TOPSQLI.md` |
-| XSS | `TOPXSS.md` |
-| IDOR | `TOPIDOR.md` |
-| SSRF | `TOPSSRF.md` |
-| RCE | `TOPRCE.md` |
-| XXE | `TOPXXE.md` |
-| CSRF | `TOPCSRF.md` |
-| Business Logic | `TOPBUSINESSLOGIC.md` |
-| Account Takeover | `TOPACCOUNTTAKEOVER.md` |
-| Auth Bypass | `TOPAUTH.md` |
-| Authorization | `TOPAUTHORIZATION.md` |
-| Open Redirect | `TOPOPENREDIRECT.md` |
-| Subdomain Takeover | `TOPSUBDOMAINTAKEOVER.md` |
-| Race Condition | `TOPRACECONDITION.md` |
-| File Upload | `TOPUPLOAD.md` |
-| Information Disclosure | `TOPINFODISCLOSURE.md` |
-| REST API | `TOPAPI.md` |
-| GraphQL | `TOPGRAPHQL.md` |
-| HTTP Request Smuggling | `TOPREQUESTSMUGGLING.md` |
-| SSTI | `TOPSSTI.md` |
-| Mobile | `TOPMOBILE.md` |
-| Clickjacking | `TOPCLICKJACKING.md` |
-
-### Example Usage
-
-When you find an IDOR vulnerability, read the TOPIDOR.md file:
-```
-Read ~/.config/kilo/skills/security-review/h1-reports/tops_by_bug_type/TOPIDOR.md
-```
-
-Then include in your report:
-```
-### HackerOne Cross-Reference
-Similar IDOR vulnerabilities that paid:
-- [Report #1234] - $5000 - Company X paid for IDOR on /api/user/{id}
-- [Report #5678] - $3000 - Company Y paid for IDOR on /api/balance
-```
-
-### Bug Bounty Value Assessment
-
-Use HackerOne data to assess if your finding is valuable:
-- Check if similar issues paid in your target's program
-- Look at bounty ranges for that vulnerability type
-- Identify if the target accepts that category
+1. Lead with highest-severity finding — no long preamble.
+2. Every HIGH+ needs: code evidence + PoC + H1 reference + code fix.
+3. Fixes are actual replacement code, not prose advice.
+4. Never report HIGH without confirming attacker control via data-flow trace.
+5. Clean codebase → say so with evidence. Never manufacture findings.
+6. CVSS 3.1 scores required for Critical and High.
+7. Every finding needs CWE and OWASP reference.
