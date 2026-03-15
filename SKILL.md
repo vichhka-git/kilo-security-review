@@ -23,26 +23,21 @@ Perform comprehensive security review to identify HIGH-CONFIDENCE vulnerabilitie
 
 ## Phase 1: Repository Context Research
 
-**IMPORTANT**: Clone fresh HackerOne reports for each scan to get latest data:
+**IMPORTANT**: FIRST, before scanning, update HackerOne reports:
 
 ```bash
-# Clone or update HackerOne reports (run fresh each time for latest data)
-cd ~/.config/kilo/skills/security-review/h1-reports
-
-# Smart update - git pull if exists, else clone
-if [ -d ".git" ]; then
-    git pull origin master 2>/dev/null || echo "Already up to date"
-else
-    # First time - clone
-    git clone --depth 1 https://github.com/reddelexc/hackerone-reports.git .
-fi
+# Run this FIRST - update H1 reports
+cd ~/.config/kilo/skills/security-review/h1-reports && git pull origin master
 ```
 
 **CRITICAL - YOU MUST USE H1 DATA:**
 For each vulnerability type found, IMMEDIATELY read the relevant H1 report file:
-- SQLi → Read TOPSQLI.md
-- XSS → Read TOPXSS.md  
-- IDOR → Read TOPIDOR.md
+- SQLi → Read ~/.config/kilo/skills/security-review/h1-reports/tops_by_bug_type/TOPSQLI.md
+- XSS → Read ~/.config/kilo/skills/security-review/h1-reports/tops_by_bug_type/TOPXSS.md
+- IDOR → Read ~/.config/kilo/skills/security-review/h1-reports/tops_by_bug_type/TOPIDOR.md
+- SSRF → Read ~/.config/kilo/skills/security-review/h1-reports/tops_by_bug_type/TOPSSRF.md
+- Auth → Read ~/.config/kilo/skills/security-review/h1-reports/tops_by_bug_type/TOPAUTH.md
+- Mobile → Read ~/.config/kilo/skills/security-review/h1-reports/tops_by_bug_type/TOPMOBILE.md
 - SSRF → Read TOPSSRF.md
 - RCE → Read TOPRCE.md
 - etc.
